@@ -4,7 +4,7 @@
  * Zero API key required, 100% legal, and globally cached.
  */
 
-import { MediaItem } from '../types/index.js';
+import { MediaItem, AiringScheduleItem, CharacterItem, RecommendationItem } from '../types/index.js';
 
 const ANILIST_GRAPHQL_ENDPOINT = 'https://graphql.anilist.co';
 
@@ -190,4 +190,150 @@ export async function getTopRatedAnime(page = 1, perPage = 20): Promise<{ media:
     media: (data.Page.media || []).map(normalizeMedia),
     pageInfo: data.Page.pageInfo,
   };
+}
+
+/**
+ * Fetches the weekly airing schedule with real-time countdown timestamps.
+ */
+export async function getAiringSchedule(daysAhead = 7, perPage = 30): Promise<AiringScheduleItem[]> {
+  const now = Math.floor(Date.now() / 1000);
+  const future = now + daysAhead * 86400;
+
+  const query = `
+    query ($now: Int, $future: Int, $perPage: Int) {
+      Page(page: 1, perPage: $perPage) {
+        airingSchedules(airingAt_greater: $now, airingAt_lesser: $future, sort: TIME) {
+          id
+          airingAt
+          timeUntilAiring
+          episode
+          media {
+            id
+            title {
+              romaji
+              english
+              native
+            }
+            format
+            coverImage {
+              large
+              extraLarge
+            }
+            genres
+            averageScore
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await fetchAniList<any>(query, { now, future, perPage });
+    const schedules = data.Page?.airingSchedules || [];
+    return schedules.map((s: any) => ({
+      id: s.id,
+      airingAt: s.airingAt,
+      timeUntilAiring: s.timeUntilAiring,
+      episode: s.episode,
+      media: {
+        id: s.media.id,
+        title: s.media.title,
+        format: s.media.format,
+        coverImage: s.media.coverImage,
+        genres: s.media.genres || [],
+        averageScore: s.media.averageScore || null,
+      }
+    }));
+  } catch (err) {
+    console.error('Failed to fetch airing schedule:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetches character cast with Japanese Voice Actors (Seiyuu) and similar recommendations.
+ */
+export async function getAnimeCastAndRecommendations(id: number): Promise<{ characters: CharacterItem[]; recommendations: RecommendationItem[] }> {
+  const query = `
+    query ($id: Int) {
+      Media(id: $id) {
+        characters(sort: ROLE, perPage: 10) {
+          edges {
+            role
+            node {
+              id
+              name {
+                full
+              }
+              image {
+                large
+              }
+            }
+            voiceActors(language: JAPANESE) {
+              id
+              name {
+                full
+              }
+              image {
+                large
+              }
+              language
+            }
+          }
+        }
+        recommendations(sort: RATING_DESC, perPage: 8) {
+          nodes {
+            mediaRecommendation {
+              id
+              title {
+                romaji
+                english
+              }
+              format
+              coverImage {
+                large
+              }
+              averageScore
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await fetchAniList<any>(query, { id });
+    const rawChars = data.Media?.characters?.edges || [];
+    const characters: CharacterItem[] = rawChars.map((edge: any) => {
+      const va = edge.voiceActors?.[0];
+      return {
+        id: edge.node.id,
+        name: edge.node.name.full,
+        role: edge.role || 'MAIN',
+        image: edge.node.image?.large || '',
+        voiceActor: va ? {
+          id: va.id,
+          name: va.name.full,
+          image: va.image?.large || '',
+          language: va.language || 'Japanese',
+        } : null,
+      };
+    });
+
+    const rawRecs = data.Media?.recommendations?.nodes || [];
+    const recommendations: RecommendationItem[] = rawRecs
+      .filter((n: any) => n.mediaRecommendation)
+      .map((n: any) => ({
+        id: n.mediaRecommendation.id,
+        title: n.mediaRecommendation.title.english || n.mediaRecommendation.title.romaji,
+        coverImage: n.mediaRecommendation.coverImage?.large || '',
+        averageScore: n.mediaRecommendation.averageScore,
+        format: n.mediaRecommendation.format || 'TV',
+      }));
+
+    return { characters, recommendations };
+  } catch (err) {
+    console.error('Failed to fetch cast/recs:', err);
+    return { characters: [], recommendations: [] };
+  }
 }

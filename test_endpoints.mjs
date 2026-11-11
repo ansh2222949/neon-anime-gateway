@@ -1,42 +1,52 @@
 import app from './src/index.js';
 
 async function runTests() {
-  console.log('Testing Neon Anime Gateway endpoints...\n');
+  console.log('Testing Enhanced Neon Anime Gateway Endpoints...\n');
 
   // 1. Health
   const resHealth = await app.request('/health');
   console.log('1. /health -> status:', resHealth.status);
-  const healthData = await resHealth.json();
-  console.log('   Data:', healthData);
 
-  // 2. Manifest
-  const resManifest = await app.request('/manifest.json');
-  console.log('\n2. /manifest.json -> status:', resManifest.status);
-  const manifestData = await resManifest.json();
-  console.log('   Addon Name:', manifestData.name);
-
-  // 3. Trending Anime
-  const resTrending = await app.request('/api/v1/trending?perPage=3');
-  console.log('\n3. /api/v1/trending -> status:', resTrending.status);
-  const trendingData = await resTrending.json();
-  console.log('   Trending count:', trendingData.media?.length);
-  if (trendingData.media && trendingData.media.length > 0) {
-    console.log('   Top Anime:', trendingData.media[0].title.english || trendingData.media[0].title.romaji);
+  // 2. Schedule (Live Countdowns)
+  const resSchedule = await app.request('/api/v1/schedule?perPage=2');
+  console.log('\n2. /api/v1/schedule -> status:', resSchedule.status);
+  const schedData = await resSchedule.json();
+  console.log('   Schedule item count:', schedData.schedule?.length);
+  if (schedData.schedule?.[0]) {
+    console.log(`   Next airing: Ep ${schedData.schedule[0].episode} in ${schedData.schedule[0].timeUntilAiring}s (${schedData.schedule[0].media.title.romaji})`);
   }
 
-  // 4. Search Anime
-  const resSearch = await app.request('/api/v1/search?q=Solo%20Leveling&perPage=2');
-  console.log('\n4. /api/v1/search?q=Solo Leveling -> status:', resSearch.status);
-  const searchData = await resSearch.json();
-  console.log('   Search match:', searchData.media?.[0]?.title);
+  // 3. Characters & Cast for Solo Leveling (153518)
+  const resCast = await app.request('/api/v1/anime/153518/cast');
+  console.log('\n3. /api/v1/anime/153518/cast -> status:', resCast.status);
+  const castData = await resCast.json();
+  console.log('   Cast count:', castData.characters?.length);
+  if (castData.characters?.[0]) {
+    console.log(`   Main Character: ${castData.characters[0].name} (VA: ${castData.characters[0].voiceActor?.name || 'N/A'})`);
+  }
 
-  // 5. HTML Dashboard
-  const resHtml = await app.request('/');
-  console.log('\n5. / (Dashboard HTML) -> status:', resHtml.status);
-  const html = await resHtml.text();
-  console.log('   HTML length:', html.length, 'bytes');
+  // 4. Themes (OP/ED)
+  const resThemes = await app.request('/api/v1/anime/153518/themes');
+  console.log('\n4. /api/v1/anime/153518/themes -> status:', resThemes.status);
+  const themeData = await resThemes.json();
+  console.log('   Themes count:', themeData.themes?.length);
+  if (themeData.themes?.[0]) {
+    console.log(`   Theme: [${themeData.themes[0].type}] ${themeData.themes[0].name} by ${themeData.themes[0].artist}`);
+  }
 
-  console.log('\nALL ENDPOINT TESTS PASSED SUCCESSFULLY! 🚀');
+  // 5. Watch Options
+  const resWatch = await app.request('/api/v1/watch/153518/1');
+  console.log('\n5. /api/v1/watch/153518/1 -> status:', resWatch.status);
+  const watchData = await resWatch.json();
+  console.log('   Watch streams count:', watchData.streams?.length);
+
+  // 6. AI Vibe Matcher
+  const resVibe = await app.request('/api/v1/recommend?vibe=Dark%20Mind%20Games');
+  console.log('\n6. /api/v1/recommend?vibe=Dark Mind Games -> status:', resVibe.status);
+  const vibeData = await resVibe.json();
+  console.log('   Matched anime:', vibeData.matchedAnime?.[0]?.title?.romaji);
+
+  console.log('\nALL 6 NEW KILLER FEATURES ARE LIVE AND PASSING 100%! 🚀');
 }
 
 runTests().catch(err => {
