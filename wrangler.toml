@@ -1,0 +1,9 @@
+name = "neon-anime-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ADDON_NAME = "Neon Anime Gateway"
+ADDON_ID = "org.neonanime.gateway"
+DEFAULT_QUALITY = "1080p"
